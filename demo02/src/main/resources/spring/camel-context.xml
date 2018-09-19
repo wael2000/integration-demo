@@ -8,11 +8,24 @@
         address="http://spring-boot-cxf-jaxws-myservices.apps.dubai.openshiftworkshop.com/service/accountService"
         id="accountService" loggingFeatureEnabled="true" serviceClass="sample.ws.service.Hello"/>
     <bean class="org.enbd.poc.amq.AccountGenerator" id="accountGenerator"/>
+
+    <bean class="org.apache.activemq.camel.component.ActiveMQComponent" id="activemq">
+        <property name="connectionFactory">
+            <bean class="org.apache.activemq.ActiveMQConnectionFactory">
+                <property name="brokerURL" value="tcp://amqbroker-amq-tcp:61616"/>
+                <property name="userName" value="admin"/>
+                <property name="password" value="admin"/>
+            </bean>
+        </property>
+    </bean>
+
     <camelContext id="camel" xmlns="http://camel.apache.org/schema/spring">
+
         <endpoint id="javaXMLTrans" uri="dozer:javaXMLTrans?sourceModel=sample.ws.service.Account&amp;targetModel=generated_1524219928973.DemoAccount&amp;marshalId=generated_1524219928973&amp;mappingFile=transformation.xml"/>
         <dataFormats>
             <jaxb contextPath="generated_1524219928973" id="generated_1524219928973"/>
         </dataFormats>
+
         <restConfiguration bindingMode="json_xml" component="servlet" port="8080">
             <dataFormatProperty key="xml.out.mustBeJAXBElement" value="false"/>
             <dataFormatProperty key="prettyPrint" value="true"/>
@@ -20,6 +33,7 @@
             <apiProperty key="api.title" value="Customer Camel REST API"/>
             <apiProperty key="api.version" value="1.0.0"/>
         </restConfiguration>
+
         <rest path="/json">
             <get bindingMode="json" outType="sample.ws.service.Account"
                 produces="application/json" type="java.lang.String" uri="/accounts/{id}">
@@ -32,6 +46,7 @@
                 <to uri="direct:account"/>
             </post>
         </rest>
+
         <rest consumes="application/xml" path="/xml" produces="application/xml">
             <post bindingMode="xml" outType="sample.ws.service.Account"
                 produces="application/xml" type="java.lang.String" uri="/accounts/{id}">
@@ -44,6 +59,7 @@
                 <to uri="direct:accountxml"/>
             </get>
         </rest>
+
         <rest consumes="application/json" path="/jms" produces="application/json">
             <get bindingMode="json" outType="sample.ws.service.Account"
                 produces="application/json" type="java.lang.String" uri="/accounts">
@@ -51,6 +67,7 @@
                 <to uri="direct:accountjms"/>
             </get>
         </rest>
+
         <route id="soap_to_rest_route">
             <from id="_fromAccountXml" uri="direct:accountxml"/>
             <setBody id="_acct_xml_id">
@@ -75,6 +92,22 @@
                 <simple>${body[0]}</simple>
             </setBody>
         </route>
+
+        <route id="_produce_jms_route">
+            <from id="fromxmlAcct" uri="direct:accountjms"/>
+            <!-- <bean id="route-new-account" method="generateAccounts" ref="accountGenerator"/> -->
+            <split id="_account_splitter">
+                <xpath>/accounts/account</xpath>
+                <to id="queue-account" uri="activemq:queue:incomingAccounts?disableTimeToLive=true&amp;disableReplyTo=true"/>
+            </split>
+            <setHeader headerName="content-type" id="_setHeaderjms1">
+                <simple>application/json</simple>
+            </setHeader>
+            <setBody id="_setbodyXML">
+                <simple>Done!</simple>
+            </setBody>
+        </route>
+
 
         <route id="readHttpStreamAndDumpToFile">
             <from id="readHttpStreamAndDumpToFileStarter" uri="jetty:http://0.0.0.0:8123?disableStreamCache=true"/>
