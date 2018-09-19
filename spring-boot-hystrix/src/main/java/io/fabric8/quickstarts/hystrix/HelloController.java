@@ -34,7 +34,9 @@ public class HelloController {
     })
     public String hello() {
         //return restTemplate.getForObject("http://spring-boot-webmvc", String.class);
-        return restTemplate.getForObject("http://localhost:8080", String.class);
+        //return restTemplate.getForObject("http://localhost:8080", String.class);
+        return restTemplate.getForObject(System.getenv("SERVICE_URL"), String.class);
+
     }
 
     public String helloFallback() {
